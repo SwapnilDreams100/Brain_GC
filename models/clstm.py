@@ -494,18 +494,20 @@ def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
                 print('Loss = %f' % mean_loss)
                 print('Variable usage = %.2f%%'
                       % (100 * torch.mean(clstm.GC().float())))
-
-            # Check for early stopping.
-            if mean_loss < best_loss:
-                best_loss = mean_loss
-                best_it = it
-                best_model = deepcopy(clstm)
-            elif int(100*np.mean(clstm.GC().cpu().data.numpy())) == int(percent_var):
+            print(int(100*np.mean(clstm.GC().cpu().data.numpy())))
+            print(clstm.GC().cpu().data.numpy())
+            if int(100*np.mean(clstm.GC().cpu().data.numpy())) == int(percent_var):
                 best_loss = mean_loss
                 best_it = it
                 best_model = deepcopy(clstm)
                 print('found sparsity')
                 break
+            
+            # Check for early stopping.
+            if mean_loss < best_loss:
+                best_loss = mean_loss
+                best_it = it
+                best_model = deepcopy(clstm)
             elif (it - best_it) == lookback * check_every:
                 if verbose:
                     print('Stopping early')
