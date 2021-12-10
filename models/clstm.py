@@ -494,7 +494,6 @@ def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
                 print('Loss = %f' % mean_loss)
                 print('Variable usage = %.2f%%'
                       % (100 * torch.mean(clstm.GC().float())))
-            print(int(100*np.mean(clstm.GC().cpu().data.numpy())))
             print(clstm.GC().cpu().data.numpy())
             if int(100*np.mean(clstm.GC().cpu().data.numpy())) == int(percent_var):
                 best_loss = mean_loss
