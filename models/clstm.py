@@ -440,7 +440,7 @@ def train_model_adam(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
 
 
 def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
-                     lookback=5, check_every=50, verbose=1):
+                     lookback=5, check_every=50, percent_var=None, verbose=1):
     '''Train model with Adam.'''
     p = X.shape[-1]
     loss_fn = nn.MSELoss(reduction='mean')
@@ -500,6 +500,12 @@ def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
                 best_loss = mean_loss
                 best_it = it
                 best_model = deepcopy(clstm)
+            elif np.mean(clstm.GC().float()) == percent_var:
+                best_loss = mean_loss
+                best_it = it
+                best_model = deepcopy(clstm)
+                print('found sparsity')
+                break
             elif (it - best_it) == lookback * check_every:
                 if verbose:
                     print('Stopping early')
