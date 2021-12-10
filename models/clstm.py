@@ -488,8 +488,9 @@ def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
             best_it = it
             best_model = deepcopy(clstm)
             print('found sparsity')
-            break
             
+        if int(100*np.mean(clstm.GC().cpu().data.numpy())) < int(percent_var):
+            break
         # Check progress.
         if (it + 1) % check_every == 0:
             # Add nonsmooth penalty.
