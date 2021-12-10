@@ -500,7 +500,7 @@ def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
                 best_loss = mean_loss
                 best_it = it
                 best_model = deepcopy(clstm)
-            elif np.mean(clstm.GC().float()) == percent_var:
+            elif int(100*np.mean(clstm.GC().cpu().data.numpy())) == int(percent_var):
                 best_loss = mean_loss
                 best_it = it
                 best_model = deepcopy(clstm)
