@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from copy import deepcopy
-
+from torch.utils.data import DataLoader, TensorDataset
 
 class LSTM(nn.Module):
     def __init__(self, num_series, hidden):
@@ -438,6 +438,107 @@ def train_model_adam(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
 
     return train_loss_list
 
+def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
+                                 lam_ridge=0, lookback=5, check_every=50, percent_var = None,
+                                 verbose=1):
+    '''Train model with Adam.'''
+    p = X.shape[-1]
+    loss_fn = nn.MSELoss(reduction='mean')
+    train_loss_list = []
+
+    # Set up data.
+    X, Y = zip(*[arrange_input(x, context) for x in X])
+    X = torch.cat(X, dim=0)
+    Y = torch.cat(Y, dim=0)
+
+    # Set up data loader.
+    dataset = TensorDataset(X, Y)
+    loader = DataLoader(dataset, batch_size=mbsize, shuffle=True,
+                        drop_last=False)
+    device = next(clstm.parameters()).device
+
+    # For early stopping.
+    best_it = None
+    best_loss = np.inf
+    best_model = None
+
+    for it in range(max_iter):
+        for x, y in loader:
+            # Move to device.
+            x = x.to(device)
+            y = y.to(device)
+
+            # Calculate loss.
+            pred = [clstm.networks[i](x)[0] for i in range(p)]
+            loss = (len(x) / len(X)) * sum(
+                [loss_fn(pred[i][:, :, 0], y[:, :, i]) for i in range(p)])
+
+            # Accumulate gradients.
+            loss.backward()
+
+        # Accumulate gradients for smooth penalty.
+        ridge = sum(
+            [ridge_regularize(net, lam_ridge) for net in clstm.networks])
+        ridge.backward()
+
+        # Take gradient step.
+        for param in clstm.parameters():
+            param.data -= lr * param.grad
+
+        # Take prox step.
+        if lam > 0:
+            for net in clstm.networks:
+                prox_update(net, lam, lr)
+
+        # Zero grad.
+        clstm.zero_grad()
+
+        # Check progress.
+        if (it + 1) % check_every == 0:
+            with torch.no_grad():
+                total_loss = 0
+                for x, y in loader:
+                    # Move to device.
+                    x = x.to(device)
+                    y = y.to(device)
+
+                    # Calculate loss.
+                    pred = [clstm.networks[i](x)[0] for i in range(p)]
+                    loss = sum([loss_fn(pred[i][:, :, 0], y[:, :, i])
+                                for i in range(p)])
+                    total_loss = total_loss + len(x) / len(X) * loss
+
+                # Add smooth penalty.
+                ridge = sum([ridge_regularize(net, lam_ridge)
+                             for net in clstm.networks])
+                smooth = ridge + total_loss
+
+                # Add nonsmooth penalty.
+                nonsmooth = sum(
+                    [regularize(net, lam) for net in clstm.networks])
+                mean_loss = (smooth + nonsmooth) / p
+                train_loss_list.append(mean_loss.detach())
+
+            if verbose > 0:
+                print(('-' * 10 + 'Iter = %d' + '-' * 10) % (it + 1))
+                print('Loss = %f' % mean_loss)
+                print('Variable usage = %.2f%%'
+                      % (100 * torch.mean(clstm.GC().float())))
+
+            # Check for early stopping.
+            if mean_loss < best_loss:
+                best_loss = mean_loss
+                best_it = it
+                best_model = deepcopy(clstm)
+            elif (it - best_it) == lookback * check_every:
+                if verbose:
+                    print('Stopping early')
+                break
+
+    # Restore best model.
+    restore_parameters(clstm, best_model)
+
+    return train_loss_list
 
 def train_model_ista(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
                      lookback=5, check_every=50, percent_var=None, verbose=1):
