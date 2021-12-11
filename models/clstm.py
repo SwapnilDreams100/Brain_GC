@@ -439,7 +439,7 @@ def train_model_adam(clstm, X, context, lr, max_iter, lam=0, lam_ridge=0,
     return train_loss_list
 
 def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
-                                 lam_ridge=0, lookback=5, check_every=50, percent_var = None,
+                                 lam_ridge=0, lookback=5, check_every=50, percent_var = 0,
                                  verbose=1):
     '''Train model with Adam.'''
     p = X.shape[-1]
@@ -450,7 +450,7 @@ def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
     X, Y = zip(*[arrange_input(x, context) for x in X])
     X = torch.cat(X, dim=0)
     Y = torch.cat(Y, dim=0)
-
+    print(X.size())
     # Set up data loader.
     dataset = TensorDataset(X, Y)
     loader = DataLoader(dataset, batch_size=mbsize, shuffle=True,
@@ -492,6 +492,16 @@ def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
 
         # Zero grad.
         clstm.zero_grad()
+        
+        if int(100*np.mean(clstm.GC().cpu().data.numpy())) == int(percent_var):
+            print(clstm.GC().cpu().data.numpy())
+            best_loss = mean_loss
+            best_it = it
+            best_model = deepcopy(clstm)
+            print('found sparsity')
+            
+        if int(100*np.mean(clstm.GC().cpu().data.numpy())) < int(percent_var):
+            break
 
         # Check progress.
         if (it + 1) % check_every == 0:
