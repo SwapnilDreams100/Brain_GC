@@ -502,7 +502,7 @@ def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
             print('found sparsity')
             
         if int(100*np.mean(clstm.GC().cpu().data.numpy())) < int(percent_var):
-            if flag:
+            if not flag:
                 print(clstm.GC().cpu().data.numpy())
                 best_loss = mean_loss
                 best_it = it
