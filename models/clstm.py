@@ -461,7 +461,7 @@ def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
     best_it = None
     best_loss = np.inf
     best_model = None
-
+    flag= False
     for it in range(max_iter):
         for x, y in loader:
             # Move to device.
@@ -498,9 +498,16 @@ def train_model_accumulated_ista(clstm, X, context, mbsize, lr, max_iter, lam=0,
             best_loss = mean_loss
             best_it = it
             best_model = deepcopy(clstm)
+            flag = True
             print('found sparsity')
             
         if int(100*np.mean(clstm.GC().cpu().data.numpy())) < int(percent_var):
+            if flag:
+                print(clstm.GC().cpu().data.numpy())
+                best_loss = mean_loss
+                best_it = it
+                best_model = deepcopy(clstm)
+                print('found sparsity')
             break
 
         # Check progress.
